@@ -39,6 +39,7 @@ void loop() {
     }
     prevBindMillis = millis();
   }
+  prevBindState = bindState;
   if (testState >= 1 && millis() - prevTestMillis >= interval) {
     prevTestMillis = millis();
       if (testState == 1) { // Start motor 60 sec speed 255/3v*2,0v=170
