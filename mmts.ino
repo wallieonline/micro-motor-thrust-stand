@@ -3,11 +3,16 @@
 #define PWMD6_OUT_PIN 6
 #define PWMD9_OUT_PIN 9
 #define PWMD10_OUT_PIN 10
+#define BIND_IN_PIN 11
 
-unsigned long previousMillis = 0;
-unsigned int test = 0;
-unsigned int pwmv = 0;
-unsigned long interval = 0; // interval (milliseconds)
+uint8_t bindState;
+uint8_t prevBindState = HIGH;
+uint32_t prevBindMillis = 0;
+uint8_t testState = 0;
+uint8_t testPWMV = 0;
+uint32_t prevTestMillis = 0;
+uint32_t debounce = 1000; // interval (milliseconds)
+uint32_t interval = 0; // interval (milliseconds)
 
 void setup()
 {
@@ -16,58 +21,56 @@ void setup()
   pinMode(PWMD6_OUT_PIN,OUTPUT);
   pinMode(PWMD9_OUT_PIN,OUTPUT);
   pinMode(PWMD10_OUT_PIN,OUTPUT);
+  pinMode(BIND_IN_PIN,INPUT);
 }
 
-void loop()
-{
-  unsigned long currentMillis = millis();
-  if (currentMillis - previousMillis >= interval) {
-    previousMillis = currentMillis;
-    if (test == 0) { // Small delay for starting tests
-      interval = 5000;
-      pwmv = 0;
-      analogWrite(PWMD5_OUT_PIN,0);
-      analogWrite(PWMD6_OUT_PIN,0);
-      analogWrite(PWMD9_OUT_PIN,0);
-      analogWrite(PWMD10_OUT_PIN,0);
-      test = 1;
-    } else if (test == 1) { // Start motor 60 sec speed 255/3v*2v=170
-      interval = 60000;
-      pwmv = 170;
-      analogWrite(PWMD5_OUT_PIN,170);
-      analogWrite(PWMD6_OUT_PIN,170);
-      analogWrite(PWMD9_OUT_PIN,170);
-      analogWrite(PWMD10_OUT_PIN,170);
-      test = 2;
-    } else if (test == 2) { // Start motor 60 sec speed 255/3v*2v=212,5
-      interval = 60000;
-      pwmv = 212;
-      analogWrite(PWMD5_OUT_PIN,212);
-      analogWrite(PWMD6_OUT_PIN,212);
-      analogWrite(PWMD9_OUT_PIN,212);
-      analogWrite(PWMD10_OUT_PIN,212);
-      test = 3;
-    } else if (test == 3) { // Start motor 60 sec full speed
-      interval = 60000;
-      pwmv = 255;
-      analogWrite(PWMD5_OUT_PIN,255);
-      analogWrite(PWMD6_OUT_PIN,255);
-      analogWrite(PWMD9_OUT_PIN,255);
-      analogWrite(PWMD10_OUT_PIN,255);
-      test = 4;
-    } else if (test == 4) { // Stop motors wait 30 sec and goto test1
-      interval = 30000;
-      pwmv = 0;
-      analogWrite(PWMD5_OUT_PIN,0);
-      analogWrite(PWMD6_OUT_PIN,0);
-      analogWrite(PWMD9_OUT_PIN,0);
-      analogWrite(PWMD10_OUT_PIN,0);
-      test = 1;
+void loop() {
+  bindState = digitalRead(BIND_IN_PIN);
+  if (bindState == LOW && prevBindState == HIGH && millis() - prevBindMillis >= debounce) {
+    if (testState == 0) {
+      testState = 1;
+      Serial.println("Test Started...");
+    } else {
+      testState = 0;
+      testPWMV = 0;
+      interval = 0;
+      myWriteMotors(testPWMV);
+      Serial.println("Test Stopped...");
     }
-      Serial.print("Motor PWM = ");
-      Serial.print(pwmv);
-      Serial.print("    ");
-      Serial.print("Duration = ");
-      Serial.println(interval);
+    prevBindMillis = millis();
   }
+  if (testState >= 1 && millis() - prevTestMillis >= interval) {
+    prevTestMillis = millis();
+      if (testState == 1) { // Start motor 60 sec speed 255/3v*2,0v=170
+        interval = 60000;
+        testPWMV = 170;
+        testState = 2;
+    } else if (testState == 2) { // Start motor 60 sec speed 255/3v*2,5v=212,5
+        interval = 60000;
+        testPWMV = 212;
+        testState = 3;
+    } else if (testState == 3) { // Start motor 60 sec full speed
+        interval = 60000;
+        testPWMV = 255;
+        testState = 4;
+    } else if (testState == 4) { // Stop motors wait 30 sec and goto test1
+        interval = 30000;
+        testPWMV = 0;
+        testState = 1;
+    }
+    myWriteMotors(testPWMV);
+    prevTestMillis = millis();
+    Serial.print("Motor PWM = ");
+    Serial.print(testPWMV);
+    Serial.print("    ");
+    Serial.print("Duration = ");
+    Serial.println(interval);
+  }
+}
+
+void myWriteMotors(uint8_t pwmv) {
+  analogWrite(PWMD5_OUT_PIN,pwmv);
+  analogWrite(PWMD6_OUT_PIN,pwmv);
+  analogWrite(PWMD9_OUT_PIN,pwmv);
+  analogWrite(PWMD10_OUT_PIN,pwmv);
 }
